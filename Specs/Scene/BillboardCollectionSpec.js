@@ -42,7 +42,6 @@ defineSuite([
         pollToPromise,
         when) {
     "use strict";
-    /*global jasmine,describe,xdescribe,it,xit,expect,beforeEach,afterEach,beforeAll,afterAll,spyOn*/
 
     var scene;
     var context;
@@ -1139,7 +1138,7 @@ defineSuite([
         });
 
         scene.renderForSpecs();
-        var actual = scene._commandList[0].boundingVolume;
+        var actual = scene.frameState.commandList[0].boundingVolume;
 
         var positions = [one.position, two.position];
         var expected = BoundingSphere.fromPoints(positions);
@@ -1163,7 +1162,7 @@ defineSuite([
         // Update scene state
         scene.morphToColumbusView(0);
         scene.renderForSpecs();
-        var actual = scene._commandList[0].boundingVolume;
+        var actual = scene.frameState.commandList[0].boundingVolume;
 
         var projectedPositions = [
             projection.project(ellipsoid.cartesianToCartographic(one.position)),
@@ -1204,7 +1203,7 @@ defineSuite([
         camera.frustum = orthoFrustum;
 
         scene.renderForSpecs();
-        var actual = scene._commandList[0].boundingVolume;
+        var actual = scene.frameState.commandList[0].boundingVolume;
 
         var projectedPositions = [
             projection.project(ellipsoid.cartesianToCartographic(one.position)),
@@ -1229,7 +1228,7 @@ defineSuite([
         });
 
         scene.renderForSpecs();
-        var actual = scene._commandList[0].boundingVolume;
+        var actual = scene.frameState.commandList[0].boundingVolume;
 
         var positions = [one.position, two.position];
         var bs = BoundingSphere.fromPoints(positions);
@@ -1252,7 +1251,7 @@ defineSuite([
             position : Cartesian3.fromDegrees(-50.0, -50.0)
         });
         scene.renderForSpecs();
-        var centeredRadius = scene._commandList[0].boundingVolume.radius;
+        var centeredRadius = scene.frameState.commandList[0].boundingVolume.radius;
         billboards.removeAll();
 
         billboards.add({
@@ -1261,7 +1260,7 @@ defineSuite([
             verticalOrigin: VerticalOrigin.TOP
         });
         scene.renderForSpecs();
-        var verticalRadius = scene._commandList[0].boundingVolume.radius;
+        var verticalRadius = scene.frameState.commandList[0].boundingVolume.radius;
         billboards.removeAll();
 
         billboards.add({
@@ -1270,7 +1269,7 @@ defineSuite([
             horizontalOrigin: HorizontalOrigin.LEFT
         });
         scene.renderForSpecs();
-        var horizontalRadius = scene._commandList[0].boundingVolume.radius;
+        var horizontalRadius = scene.frameState.commandList[0].boundingVolume.radius;
 
         expect(verticalRadius).toEqual(2*centeredRadius);
         expect(horizontalRadius).toEqual(2*centeredRadius);
@@ -1601,7 +1600,7 @@ defineSuite([
 
         it('creating with a height reference creates a height update callback', function() {
             scene.globe = createMockGlobe();
-            var b = billboardsWithHeight.add({
+            billboardsWithHeight.add({
                 heightReference : HeightReference.CLAMP_TO_GROUND,
                 position : Cartesian3.fromDegrees(-72.0, 40.0)
             });

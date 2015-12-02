@@ -60,7 +60,6 @@ var filesToClean = ['Source/Cesium.js',
                     'Instrumented',
                     'Source/Shaders/**/*.js',
                     'Specs/SpecList.js',
-                    'Apps/Sandcastle/.jshintrc',
                     'Apps/Sandcastle/jsHintOptions.js',
                     'Apps/Sandcastle/gallery/gallery-index.js',
                     'Cesium-*.zip'];
@@ -91,7 +90,7 @@ gulp.task('build', function(done) {
     createCesiumJs();
     createSpecList();
     createGalleryList();
-    createSandcastleJsHintOptions();
+    createJsHintOptions();
     done();
 });
 
@@ -214,7 +213,8 @@ gulp.task('jsHint', ['build'], function() {
     return gulp.src(jsHintFiles)
         .pipe(jshint.extract('auto'))
         .pipe(jshint())
-        .pipe(jshint.reporter('jshint-stylish'));
+        .pipe(jshint.reporter('jshint-stylish'))
+        .pipe(jshint.reporter('fail'));
 });
 
 gulp.task('jsHint-watch', function() {
@@ -283,7 +283,7 @@ gulp.task('minifyRelease', ['generateStubs'], function() {
     });
 });
 
-gulp.task('release', ['buildApps', 'generateDocumentation']);
+gulp.task('release', ['combine', 'minifyRelease', 'generateDocumentation']);
 
 gulp.task('generateStubs', ['build'], function(done) {
     mkdirp.sync(path.join('Build', 'Stubs'));
@@ -299,12 +299,9 @@ gulp.task('generateStubs', ['build'], function(done) {
         file = path.relative('Source', file);
         var moduleId = filePathToModuleId(file);
 
-        var propertyName = path.basename(file, path.extname(file));
-        propertyName = "['" + propertyName + "']";
-
         contents += '\
 define(\'' + moduleId + '\', function() {\n\
-    return Cesium' + propertyName + ';\n\
+    return Cesium[\'' + path.basename(file, path.extname(file)) + '\'];\n\
 });\n\n';
 
         modulePathMappings.push('        \'' + moduleId + '\' : \'../Stubs/Cesium\'');
@@ -464,7 +461,7 @@ function combineCesium(debug, optimizer, combineOutput) {
         },
         baseUrl : 'Source',
         skipModuleInsertion : true,
-        name : path.join('..', 'ThirdParty', 'almond-0.3.1', 'almond'),
+        name : removeExtension(path.relative('Source', require.resolve('almond'))),
         include : 'main',
         out : path.join(combineOutput, 'Cesium.js')
     });
@@ -631,9 +628,9 @@ function glslToJavaScript(minify, minifyStateFilePath) {
 
         contents = contents.split('"').join('\\"').replace(/\n/gm, '\\n\\\n');
         contents = copyrightComments + '\
-    //This file is automatically rebuilt by the Cesium build process.\n\
-    /*global define*/\n\
-    define(function() {\n\
+//This file is automatically rebuilt by the Cesium build process.\n\
+/*global define*/\n\
+define(function() {\n\
     "use strict";\n\
     return "' + contents + '";\n\
 });';
@@ -642,7 +639,9 @@ function glslToJavaScript(minify, minifyStateFilePath) {
     });
 
     // delete any left over JS files from old shaders
-    Object.keys(leftOverJsFiles).forEach(rimraf.sync);
+    Object.keys(leftOverJsFiles).forEach(function(filepath) {
+        rimraf.sync(filepath);
+    });
 
     var generateBuiltinContents = function(contents, builtins, path) {
         var amdPath = contents.amdPath;
@@ -696,13 +695,18 @@ function createCesiumJs() {
         var moduleId = file;
         moduleId = filePathToModuleId(moduleId);
 
-        var assignmentName = path.basename(file, path.extname(file));
-        assignmentName = "['" + assignmentName + "']";
+        var assignmentName = "['" + path.basename(file, path.extname(file)) + "']";
         if (moduleId.indexOf('Shaders/') === 0) {
             assignmentName = '._shaders' + assignmentName;
         }
 
         var parameterName = moduleId.replace(nonIdentifierRegexp, '_');
+
+        //Ignore the deprecated Scene version of HeadingPitchRange
+        //until it is removed with #3097
+        if (moduleId === 'Scene/HeadingPitchRange') {
+            return;
+        }
 
         moduleIds.push("'./" + moduleId + "'");
         parameters.push(parameterName);
@@ -733,7 +737,7 @@ function createSpecList() {
         specs.push("'" + filePathToModuleId(file) + "'");
     });
 
-    var contents = 'var specs = [' + specs.join(',') + '];';
+    var contents = '/*jshint unused: false*/\nvar specs = [' + specs.join(',') + '];';
     fs.writeFileSync(path.join('Specs', 'SpecList.js'), contents);
 }
 
@@ -767,16 +771,17 @@ var gallery_demos = [' + demos.join(', ') + '];';
     fs.writeFileSync(output, contents);
 }
 
-function createSandcastleJsHintOptions() {
-    var jsHintOptions = JSON.parse(fs.readFileSync('.jshintrc', 'utf8'));
-    jsHintOptions.predef = ['JSON', 'require', 'console', 'Sandcastle', 'Cesium'];
+function createJsHintOptions() {
+    var primary = JSON.parse(fs.readFileSync('.jshintrc', 'utf8'));
+    var gallery = JSON.parse(fs.readFileSync(path.join('Apps', 'Sandcastle', '.jshintrc'), 'utf8'));
+    primary.jasmine = false;
+    primary.predef = gallery.predef;
+    primary.unused = gallery.unused;
 
-    var contents = JSON.stringify(jsHintOptions, null, 2);
-    fs.writeFileSync(path.join('Apps', 'Sandcastle', '.jshintrc'), contents);
-
-    contents = '\
+    var contents = '\
 // This file is automatically rebuilt by the Cesium build process.\n\
-var sandcastleJsHintOptions = ' + contents + ';';
+var sandcastleJsHintOptions = ' + JSON.stringify(primary, null, 4) + ';';
+
     fs.writeFileSync(path.join('Apps', 'Sandcastle', 'jsHintOptions.js'), contents);
 }
 
@@ -859,6 +864,10 @@ function buildCesiumViewer() {
 
 function filePathToModuleId(moduleId) {
     return moduleId.substring(0, moduleId.lastIndexOf('.')).replace(/\\/g, '/');
+}
+
+function removeExtension(p) {
+    return p.slice(0, -path.extname(p).length);
 }
 
 function requirejsOptimize(config) {
