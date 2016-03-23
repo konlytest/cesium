@@ -37,18 +37,18 @@ define([
         DepthFunction,
         Pass,
         SceneMode) {
-    "use strict";
+    'use strict';
 
     /**
      * @private
      */
-    var DepthPlane = function() {
+    function DepthPlane() {
         this._rs = undefined;
         this._sp = undefined;
         this._va = undefined;
         this._command = undefined;
         this._mode = undefined;
-    };
+    }
 
     var depthQuadScratch = FeatureDetection.supportsTypedArrays() ? new Float32Array(12) : [];
     var scratchCartesian1 = new Cartesian3();

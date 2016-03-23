@@ -1,5 +1,5 @@
 /*jslint node: true, latedef: nofunc*/
-"use strict";
+'use strict';
 
 var fs = require('fs');
 var path = require('path');
@@ -20,6 +20,8 @@ var gulpRename = require('gulp-rename');
 var gulpReplace = require('gulp-replace');
 var Promise = require('bluebird');
 var requirejs = require('requirejs');
+var karma = require('karma').Server;
+var yargs = require('yargs');
 
 var packageJson = require('./package.json');
 var version = packageJson.version;
@@ -27,12 +29,23 @@ if (/\.0$/.test(version)) {
     version = version.substring(0, version.length - 2);
 }
 
+var karmaConfigFile = path.join(__dirname, 'Specs/karma.conf.js');
+
 //Gulp doesn't seem to have a way to get the currently running tasks for setting
 //per-task variables.  We use the command line argument here to detect which task is being run.
 var taskName = process.argv[2];
 var noDevelopmentGallery = taskName === 'release' || taskName === 'makeZipFile';
-var copyUnminified = taskName === 'combine' || taskName === 'default' || taskName === undefined;
+var buildingRelease = noDevelopmentGallery;
 var minifyShaders = taskName === 'minify' || taskName === 'minifyRelease' || taskName === 'release' || taskName === 'makeZipFile' || taskName === 'buildApps';
+
+//travis reports 32 cores but only has 3GB of memory, which causes the VM to run out.  Limit to 8 cores instead.
+var concurrency = Math.min(os.cpus().length, 8);
+
+//Since combine and minify run in parallel already, split concurrency in half when building both.
+//This can go away when gulp 4 comes out because it allows for synchronous tasks.
+if (buildingRelease) {
+    concurrency = concurrency / 2;
+}
 
 var sourceFiles = ['Source/**/*.js',
                    '!Source/*.js',
@@ -98,12 +111,19 @@ gulp.task('build-watch', function() {
     gulp.watch(buildFiles, ['build']);
 });
 
-gulp.task('buildApps', ['combine', 'minifyRelease'], function() {
+gulp.task('buildApps', function() {
     return buildCesiumViewer();
 });
 
 gulp.task('clean', function(done) {
     async.forEach(filesToClean, rimraf, done);
+});
+
+gulp.task('requirejs', function(done) {
+    var config = JSON.parse(new Buffer(process.argv[3].substring(2), 'base64').toString('utf8'));
+    requirejs.optimize(config, function() {
+        done();
+    }, done);
 });
 
 gulp.task('cloc', ['build'], function() {
@@ -152,11 +172,6 @@ gulp.task('combine', ['generateStubs'], function() {
         removePragmas : false,
         optimizer : 'none',
         outputDirectory : outputDirectory
-    }).then(function() {
-        if (!copyUnminified) {
-            return;
-        }
-        return streamToPromise(gulp.src(outputDirectory + '/**').pipe(gulp.dest(path.join('Build', 'Cesium'))));
     });
 });
 
@@ -166,11 +181,6 @@ gulp.task('combineRelease', ['generateStubs'], function() {
         removePragmas : true,
         optimizer : 'none',
         outputDirectory : outputDirectory
-    }).then(function() {
-        if (!copyUnminified) {
-            return;
-        }
-        return streamToPromise(gulp.src(outputDirectory + '/**').pipe(gulp.dest(path.join('Build', 'Cesium'))));
     });
 });
 
@@ -210,11 +220,15 @@ gulp.task('instrumentForCoverage', ['build'], function(done) {
 });
 
 gulp.task('jsHint', ['build'], function() {
-    return gulp.src(jsHintFiles)
+    var stream = gulp.src(jsHintFiles)
         .pipe(jshint.extract('auto'))
         .pipe(jshint())
-        .pipe(jshint.reporter('jshint-stylish'))
-        .pipe(jshint.reporter('fail'));
+        .pipe(jshint.reporter('jshint-stylish'));
+
+    if (yargs.argv.failTaskOnError) {
+        stream = stream.pipe(jshint.reporter('fail'));
+    }
+    return stream;
 });
 
 gulp.task('jsHint-watch', function() {
@@ -285,13 +299,60 @@ gulp.task('minifyRelease', ['generateStubs'], function() {
 
 gulp.task('release', ['combine', 'minifyRelease', 'generateDocumentation']);
 
+gulp.task('test', function(done) {
+    var argv = yargs.argv;
+
+    var enableAllBrowsers = argv.all ? true : false;
+    var includeCategory = argv.include ? argv.include : '';
+    var excludeCategory = argv.exclude ? argv.exclude : '';
+    var webglValidation = argv.webglValidation ? argv.webglValidation : false;
+    var release = argv.release ? argv.release : false;
+    var failTaskOnError = argv.failTaskOnError ? argv.failTaskOnError : false;
+    var suppressPassed = argv.suppressPassed ? argv.suppressPassed : false;
+
+    var browsers = ['Chrome'];
+    if (argv.browsers) {
+        browsers = argv.browsers.split(',');
+    }
+
+    var files = [
+        'Specs/karma-main.js',
+        {pattern : 'Source/**', included : false},
+        {pattern : 'Specs/**', included : false}
+    ];
+
+    if (release) {
+        files.push({pattern : 'Build/**', included : false});
+    }
+
+    karma.start({
+        configFile: karmaConfigFile,
+        browsers : browsers,
+        specReporter: {
+            suppressErrorSummary: false,
+            suppressFailed: false,
+            suppressPassed: suppressPassed,
+            suppressSkipped: true
+        },
+        detectBrowsers : {
+            enabled: enableAllBrowsers
+        },
+        files: files,
+        client: {
+            args: [includeCategory, excludeCategory, webglValidation, release]
+        }
+    }, function(e) {
+        return done(failTaskOnError ? e : undefined);
+    });
+});
+
 gulp.task('generateStubs', ['build'], function(done) {
     mkdirp.sync(path.join('Build', 'Stubs'));
 
     var contents = '\
 /*global define,Cesium*/\n\
 (function() {\n\
-"use strict";\n\
+\'use strict\';\n\
 /*jshint sub:true*/\n';
     var modulePathMappings = [];
 
@@ -312,7 +373,7 @@ define(\'' + moduleId + '\', function() {\n\
     var paths = '\
 /*global define*/\n\
 define(function() {\n\
-    "use strict";\n\
+    \'use strict\';\n\
     return {\n' + modulePathMappings.join(',\n') + '\n\
     };\n\
 });';
@@ -451,7 +512,7 @@ gulp.task('sortRequires', function(done) {
 });
 
 function combineCesium(debug, optimizer, combineOutput) {
-    return requirejsOptimize({
+    return requirejsOptimize('Cesium.js', {
         wrap : true,
         useStrict : true,
         optimize : optimizer,
@@ -468,12 +529,13 @@ function combineCesium(debug, optimizer, combineOutput) {
 }
 
 function combineWorkers(debug, optimizer, combineOutput) {
-    return Promise.join(
-        globby(['Source/Workers/cesiumWorkerBootstrapper.js',
-                'Source/Workers/transferTypedArrayTest.js',
-                'Source/ThirdParty/Workers/*.js']).then(function(files) {
-            return Promise.all(files.map(function(file) {
-                return requirejsOptimize({
+    //This is done waterfall style for concurrency reasons.
+    return globby(['Source/Workers/cesiumWorkerBootstrapper.js',
+                   'Source/Workers/transferTypedArrayTest.js',
+                   'Source/ThirdParty/Workers/*.js'])
+        .then(function(files) {
+            return Promise.map(files, function(file) {
+                return requirejsOptimize(file, {
                     wrap : false,
                     useStrict : true,
                     optimize : optimizer,
@@ -486,15 +548,18 @@ function combineWorkers(debug, optimizer, combineOutput) {
                     include : filePathToModuleId(path.relative('Source', file)),
                     out : path.join(combineOutput, path.relative('Source', file))
                 });
-            }));
-        }),
-        globby(['Source/Workers/*.js',
-                '!Source/Workers/cesiumWorkerBootstrapper.js',
-                '!Source/Workers/transferTypedArrayTest.js',
-                '!Source/Workers/createTaskProcessorWorker.js',
-                '!Source/ThirdParty/Workers/*.js']).then(function(files) {
-            return Promise.all(files.map(function(file) {
-                return requirejsOptimize({
+            }, {concurrency : concurrency});
+        })
+        .then(function() {
+            return globby(['Source/Workers/*.js',
+                           '!Source/Workers/cesiumWorkerBootstrapper.js',
+                           '!Source/Workers/transferTypedArrayTest.js',
+                           '!Source/Workers/createTaskProcessorWorker.js',
+                           '!Source/ThirdParty/Workers/*.js']);
+        })
+        .then(function(files) {
+            return Promise.map(files, function(file) {
+                return requirejsOptimize(file, {
                     wrap : true,
                     useStrict : true,
                     optimize : optimizer,
@@ -506,15 +571,14 @@ function combineWorkers(debug, optimizer, combineOutput) {
                     include : filePathToModuleId(path.relative('Source', file)),
                     out : path.join(combineOutput, path.relative('Source', file))
                 });
-            }));
-        })
-    );
+            }, {concurrency : concurrency});
+        });
 }
 
 function minifyCSS(outputDirectory) {
     return globby('Source/**/*.css').then(function(files) {
-        return Promise.all(files.map(function(file) {
-            return requirejsOptimize({
+        return Promise.map(files, function(file) {
+            return requirejsOptimize(file, {
                 wrap : true,
                 useStrict : true,
                 optimizeCss : 'standard',
@@ -524,7 +588,7 @@ function minifyCSS(outputDirectory) {
                 cssIn : file,
                 out : path.join(outputDirectory, path.relative('Source', file))
             });
-        }));
+        }, {concurrency : concurrency});
     });
 }
 
@@ -631,7 +695,7 @@ function glslToJavaScript(minify, minifyStateFilePath) {
 //This file is automatically rebuilt by the Cesium build process.\n\
 /*global define*/\n\
 define(function() {\n\
-    "use strict";\n\
+    \'use strict\';\n\
     return "' + contents + '";\n\
 });';
 
@@ -676,7 +740,7 @@ define([\n' +
                        '\n    ], function(\n' +
                        contents.amdClassName +
                        ') {\n\
-                           "use strict";\n\
+                           \'use strict\';\n\
                            return {\n' + contents.builtinLookup + '};\n\
 });';
 
@@ -702,12 +766,6 @@ function createCesiumJs() {
 
         var parameterName = moduleId.replace(nonIdentifierRegexp, '_');
 
-        //Ignore the deprecated Scene version of HeadingPitchRange
-        //until it is removed with #3097
-        if (moduleId === 'Scene/HeadingPitchRange') {
-            return;
-        }
-
         moduleIds.push("'./" + moduleId + "'");
         parameters.push(parameterName);
         assignments.push('Cesium' + assignmentName + ' = ' + parameterName + ';');
@@ -716,7 +774,7 @@ function createCesiumJs() {
     var contents = '\
 /*global define*/\n\
 define([' + moduleIds.join(', ') + '], function(' + parameters.join(', ') + ') {\n\
-  "use strict";\n\
+  \'use strict\';\n\
   /*jshint sub:true*/\n\
   var Cesium = {\n\
     VERSION : "' + version + '",\n\
@@ -792,7 +850,7 @@ function buildCesiumViewer() {
     mkdirp.sync(cesiumViewerOutputDirectory);
 
     var promise = Promise.join(
-        requirejsOptimize({
+        requirejsOptimize('CesiumViewer', {
             wrap : true,
             useStrict : true,
             optimizeCss : 'standard',
@@ -804,7 +862,7 @@ function buildCesiumViewer() {
             name : 'CesiumViewerStartup',
             out : cesiumViewerStartup
         }),
-        requirejsOptimize({
+        requirejsOptimize('CesiumViewer CSS', {
             wrap : true,
             useStrict : true,
             optimizeCss : 'standard',
@@ -870,9 +928,19 @@ function removeExtension(p) {
     return p.slice(0, -path.extname(p).length);
 }
 
-function requirejsOptimize(config) {
+function requirejsOptimize(name, config) {
+    console.log('Building ' + name);
     return new Promise(function(resolve, reject) {
-        requirejs.optimize(config, resolve, reject);
+        var cmd = 'npm run requirejs -- --' + new Buffer(JSON.stringify(config)).toString('base64') + ' --silent';
+        child_process.exec(cmd, function(e) {
+            if (e) {
+                console.log('Error ' + name);
+                reject(e);
+                return;
+            }
+            console.log('Finished ' + name);
+            resolve();
+        });
     });
 }
 

@@ -55,7 +55,7 @@ define([
         ImageryLayerCollection,
         QuadtreePrimitive,
         SceneMode) {
-    "use strict";
+    'use strict';
 
     /**
      * The globe rendered in the scene, including its terrain ({@link Globe#terrainProvider})
@@ -67,7 +67,7 @@ define([
      * @param {Ellipsoid} [ellipsoid=Ellipsoid.WGS84] Determines the size and shape of the
      * globe.
      */
-    var Globe = function(ellipsoid) {
+    function Globe(ellipsoid) {
         ellipsoid = defaultValue(ellipsoid, Ellipsoid.WGS84);
         var terrainProvider = new EllipsoidTerrainProvider({
             ellipsoid : ellipsoid
@@ -190,7 +190,7 @@ define([
 
         this._oceanNormalMap = undefined;
         this._zoomedOutOceanSpecularIntensity = 0.5;
-    };
+    }
 
     defineProperties(Globe.prototype, {
         /**
@@ -224,6 +224,18 @@ define([
             },
             set : function(value) {
                 this._surface.tileProvider.baseColor = value;
+            }
+        },
+        /**
+         * Gets an event that's raised when the length of the tile load queue has changed since the last render frame.  When the load queue is empty,
+         * all terrain and imagery for the current view have been loaded.  The event passes the new length of the tile load queue.
+         *
+         * @memberof Globe.prototype
+         * @type {Event}
+         */
+        tileLoadProgressEvent : {
+            get: function() {
+                return this._surface.tileLoadProgressEvent;
             }
         }
     });
@@ -389,16 +401,8 @@ define([
     /**
      * @private
      */
-    Globe.prototype.update = function(frameState) {
+    Globe.prototype.beginFrame = function(frameState) {
         if (!this.show) {
-            return;
-        }
-
-        var context = frameState.context;
-        var width = context.drawingBufferWidth;
-        var height = context.drawingBufferHeight;
-
-        if (width === 0 || height === 0) {
             return;
         }
 
@@ -422,7 +426,7 @@ define([
 
                     that._oceanNormalMap = that._oceanNormalMap && that._oceanNormalMap.destroy();
                     that._oceanNormalMap = new Texture({
-                        context : context,
+                        context : frameState.context,
                         source : image
                     });
                 });
@@ -453,11 +457,40 @@ define([
             tileProvider.oceanNormalMap = this._oceanNormalMap;
             tileProvider.enableLighting = this.enableLighting;
 
+            surface.beginFrame(frameState);
+        }
+    };
+
+    /**
+     * @private
+     */
+    Globe.prototype.update = function(frameState) {
+        if (!this.show) {
+            return;
+        }
+
+        var surface = this._surface;
+        var pass = frameState.passes;
+
+        if (pass.render) {
             surface.update(frameState);
         }
 
         if (pass.pick) {
             surface.update(frameState);
+        }
+    };
+
+    /**
+     * @private
+     */
+    Globe.prototype.endFrame = function(frameState) {
+        if (!this.show) {
+            return;
+        }
+
+        if (frameState.passes.render) {
+            this._surface.endFrame(frameState);
         }
     };
 
@@ -487,10 +520,11 @@ define([
      *
      * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
      *
-     * @see Globe#isDestroyed
      *
      * @example
      * globe = globe && globe.destroy();
+     *
+     * @see Globe#isDestroyed
      */
     Globe.prototype.destroy = function() {
         this._surfaceShaderSet = this._surfaceShaderSet && this._surfaceShaderSet.destroy();

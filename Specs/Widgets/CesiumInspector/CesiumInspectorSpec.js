@@ -9,7 +9,7 @@ defineSuite([
         Ellipsoid,
         Globe,
         createScene) {
-    "use strict";
+    'use strict';
 
     var scene;
     beforeAll(function() {
@@ -55,4 +55,4 @@ defineSuite([
             return new CesiumInspector(document.body);
         }).toThrowDeveloperError();
     });
-});
+}, 'WebGL');

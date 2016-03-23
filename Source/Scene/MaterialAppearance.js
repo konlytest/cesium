@@ -27,7 +27,7 @@ define([
         TexturedMaterialAppearanceVS,
         Appearance,
         Material) {
-    "use strict";
+    'use strict';
 
     /**
      * An appearance for arbitrary geometry (as opposed to {@link EllipsoidSurfaceAppearance}, for example)
@@ -65,7 +65,7 @@ define([
      *
      * });
      */
-    var MaterialAppearance = function(options) {
+    function MaterialAppearance(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
 
         var translucent = defaultValue(options.translucent, true);
@@ -104,7 +104,7 @@ define([
         this._vertexFormat = materialSupport.vertexFormat;
         this._flat = defaultValue(options.flat, false);
         this._faceForward = defaultValue(options.faceForward, !closed);
-    };
+    }
 
     defineProperties(MaterialAppearance.prototype, {
         /**

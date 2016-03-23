@@ -49,7 +49,7 @@ define([
         SceneMode,
         SceneTransforms,
         TweenCollection) {
-    "use strict";
+    'use strict';
 
     /**
      * Modifies the camera position and orientation based on mouse input to a canvas.
@@ -58,7 +58,7 @@ define([
      *
      * @param {Scene} scene The scene.
      */
-    var ScreenSpaceCameraController = function(scene) {
+    function ScreenSpaceCameraController(scene) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(scene)) {
             throw new DeveloperError('scene is required.');
@@ -270,7 +270,6 @@ define([
         this._lastInertiaSpinMovement = undefined;
         this._lastInertiaZoomMovement = undefined;
         this._lastInertiaTranslateMovement = undefined;
-        this._lastInertiaWheelZoomMovement = undefined;
         this._lastInertiaTiltMovement = undefined;
 
         this._tweens = new TweenCollection();
@@ -301,10 +300,9 @@ define([
         this._rotateRateRangeAdjustment = undefined;
         this._maximumRotateRate = 1.77;
         this._minimumRotateRate = 1.0 / 5000.0;
-        this._translateFactor = 1.0;
         this._minimumZoomRate = 20.0;
         this._maximumZoomRate = 5906376272000.0;  // distance from the Sun to Pluto in meters.
-    };
+    }
 
     function decay(time, coefficient) {
         if (time < 0) {
@@ -1897,10 +1895,11 @@ define([
      *
      * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
      *
-     * @see ScreenSpaceCameraController#isDestroyed
      *
      * @example
      * controller = controller && controller.destroy();
+     * 
+     * @see ScreenSpaceCameraController#isDestroyed
      */
     ScreenSpaceCameraController.prototype.destroy = function() {
         this._tweens.removeAll();

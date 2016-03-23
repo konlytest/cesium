@@ -23,12 +23,12 @@ define([
         Matrix3,
         Matrix4,
         RuntimeError) {
-    "use strict";
+    'use strict';
 
     /**
      * @private
      */
-    var createUniformArray = function(gl, activeUniform, uniformName, locations) {
+    function createUniformArray(gl, activeUniform, uniformName, locations) {
         switch (activeUniform.type) {
             case gl.FLOAT:
                 return new UniformArrayFloat(gl, activeUniform, uniformName, locations);
@@ -62,9 +62,7 @@ define([
             default:
                 throw new RuntimeError('Unrecognized uniform type: ' + activeUniform.type + ' for uniform "' + uniformName + '".');
         }
-    };
-
-    ///////////////////////////////////////////////////////////////////////////
+    }
 
     function UniformArrayFloat(gl, activeUniform, uniformName, locations) {
         var length = locations.length;

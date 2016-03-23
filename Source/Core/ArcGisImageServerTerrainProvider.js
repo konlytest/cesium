@@ -31,7 +31,7 @@ define([
         CesiumMath,
         TerrainProvider,
         throttleRequestByServer) {
-    "use strict";
+    'use strict';
 
     /**
      * A {@link TerrainProvider} that produces terrain geometry by tessellating height maps
@@ -52,17 +52,18 @@ define([
      *                    If neither parameter is specified, the WGS84 ellipsoid is used.
      * @param {Credit|String} [options.credit] The credit, which will is displayed on the canvas.
      *
-     * @see TerrainProvider
      *
      * @example
      * var terrainProvider = new Cesium.ArcGisImageServerTerrainProvider({
-     *   url : '//elevation.arcgisonline.com/ArcGIS/rest/services/WorldElevation/DTMEllipsoidal/ImageServer',
+     *   url : 'https://elevation.arcgisonline.com/ArcGIS/rest/services/WorldElevation/DTMEllipsoidal/ImageServer',
      *   token : 'KED1aF_I4UzXOHy3BnhwyBHU4l5oY6rO6walkmHoYqGp4XyIWUd5YZUC1ZrLAzvV40pR6gBXQayh0eFA8m6vPg..',
      *   proxy : new Cesium.DefaultProxy('/terrain/')
      * });
      * viewer.terrainProvider = terrainProvider;
+     * 
+     *  @see TerrainProvider
      */
-    var ArcGisImageServerTerrainProvider = function ArcGisImageServerTerrainProvider(options) {
+    function ArcGisImageServerTerrainProvider(options) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(options) || !defined(options.url)) {
             throw new DeveloperError('options.url is required.');
@@ -101,7 +102,7 @@ define([
         }
         this._credit = credit;
         this._readyPromise = when.resolve(true);
-    };
+    }
 
     defineProperties(ArcGisImageServerTerrainProvider.prototype, {
         /**

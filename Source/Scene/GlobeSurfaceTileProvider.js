@@ -24,6 +24,7 @@ define([
         '../Core/PrimitiveType',
         '../Core/Rectangle',
         '../Core/SphereOutlineGeometry',
+        '../Core/TerrainQuantization',
         '../Core/Visibility',
         '../Core/WebMercatorProjection',
         '../Renderer/Buffer',
@@ -68,6 +69,7 @@ define([
         PrimitiveType,
         Rectangle,
         SphereOutlineGeometry,
+        TerrainQuantization,
         Visibility,
         WebMercatorProjection,
         Buffer,
@@ -87,7 +89,7 @@ define([
         ImageryState,
         QuadtreeTileLoadState,
         SceneMode) {
-    "use strict";
+    'use strict';
 
     /**
      * Provides quadtree tiles representing the surface of the globe.  This type is intended to be used
@@ -102,7 +104,7 @@ define([
      *
      * @private
      */
-    var GlobeSurfaceTileProvider = function GlobeSurfaceTileProvider(options) {
+    function GlobeSurfaceTileProvider(options) {
         //>>includeStart('debug', pragmas.debug);
         if (!defined(options)) {
             throw new DeveloperError('options is required.');
@@ -156,7 +158,7 @@ define([
         this._baseColor = undefined;
         this._firstPassInitialColor = undefined;
         this.baseColor = new Color(0.0, 0.0, 0.5, 1.0);
-    };
+    }
 
     defineProperties(GlobeSurfaceTileProvider.prototype, {
         /**
@@ -281,13 +283,18 @@ define([
     }
 
     /**
-     * Called at the beginning of the update cycle for each render frame, before {@link QuadtreeTileProvider#showTileThisFrame}
+     * Called at the beginning of each render frame, before {@link QuadtreeTileProvider#showTileThisFrame}
      * or any other functions.
      *
      * @param {FrameState} frameState The frame state.
      */
-    GlobeSurfaceTileProvider.prototype.beginUpdate = function(frameState) {
-        this._imageryLayers._update();
+    GlobeSurfaceTileProvider.prototype.initialize = function(frameState) {
+        var imageryLayers = this._imageryLayers;
+
+        // update collection: imagery indices, base layers, raise layer show/hide event
+        imageryLayers._update();
+        // update each layer for texture reprojection.
+        imageryLayers.queueReprojectionCommands(frameState);
 
         if (this._layerOrderChanged) {
             this._layerOrderChanged = false;
@@ -298,19 +305,6 @@ define([
             });
         }
 
-        var i;
-        var len;
-
-        var tilesToRenderByTextureCount = this._tilesToRenderByTextureCount;
-        for (i = 0, len = tilesToRenderByTextureCount.length; i < len; ++i) {
-            var tiles = tilesToRenderByTextureCount[i];
-            if (defined(tiles)) {
-                tiles.length = 0;
-            }
-        }
-
-        this._usedDrawCommands = 0;
-
         // Add credits for terrain and imagery providers.
         var creditDisplay = frameState.creditDisplay;
 
@@ -318,13 +312,30 @@ define([
             creditDisplay.addCredit(this._terrainProvider.credit);
         }
 
-        var imageryLayers = this._imageryLayers;
-        for (i = 0, len = imageryLayers.length; i < len; ++i) {
+        for (var i = 0, len = imageryLayers.length; i < len; ++i) {
             var imageryProvider = imageryLayers.get(i).imageryProvider;
             if (imageryProvider.ready && defined(imageryProvider.credit)) {
                 creditDisplay.addCredit(imageryProvider.credit);
             }
         }
+    };
+
+    /**
+     * Called at the beginning of the update cycle for each render frame, before {@link QuadtreeTileProvider#showTileThisFrame}
+     * or any other functions.
+     *
+     * @param {FrameState} frameState The frame state.
+     */
+    GlobeSurfaceTileProvider.prototype.beginUpdate = function(frameState) {
+        var tilesToRenderByTextureCount = this._tilesToRenderByTextureCount;
+        for (var i = 0, len = tilesToRenderByTextureCount.length; i < len; ++i) {
+            var tiles = tilesToRenderByTextureCount[i];
+            if (defined(tiles)) {
+                tiles.length = 0;
+            }
+        }
+
+        this._usedDrawCommands = 0;
     };
 
     /**
@@ -398,6 +409,13 @@ define([
         for (var i = 0, length = this._usedDrawCommands; i < length; ++i) {
             addPickCommandsForTile(this, drawCommands[i], frameState);
         }
+    };
+
+    /**
+     * Cancels any imagery re-projections in the queue.
+     */
+    GlobeSurfaceTileProvider.prototype.cancelReprojections = function() {
+        this._imageryLayers.cancelReprojections();
     };
 
     /**
@@ -522,87 +540,18 @@ define([
         debug.texturesRendered += readyTextureCount;
     };
 
-    var southwestCornerScratch = new Cartesian3();
-    var northeastCornerScratch = new Cartesian3();
-    var negativeUnitY = new Cartesian3(0.0, -1.0, 0.0);
-    var negativeUnitZ = new Cartesian3(0.0, 0.0, -1.0);
-    var vectorScratch = new Cartesian3();
-
     /**
      * Gets the distance from the camera to the closest point on the tile.  This is used for level-of-detail selection.
      *
      * @param {QuadtreeTile} tile The tile instance.
      * @param {FrameState} frameState The state information of the current rendering frame.
-     * @param {Cartesian3} cameraCartesianPosition The position of the camera in world coordinates.
-     * @param {Cartographic} cameraCartographicPosition The position of the camera in cartographic / geodetic coordinates.
      *
      * @returns {Number} The distance from the camera to the closest point on the tile, in meters.
      */
     GlobeSurfaceTileProvider.prototype.computeDistanceToTile = function(tile, frameState) {
         var surfaceTile = tile.data;
-
-        var southwestCornerCartesian = surfaceTile.southwestCornerCartesian;
-        var northeastCornerCartesian = surfaceTile.northeastCornerCartesian;
-        var westNormal = surfaceTile.westNormal;
-        var southNormal = surfaceTile.southNormal;
-        var eastNormal = surfaceTile.eastNormal;
-        var northNormal = surfaceTile.northNormal;
-        var maximumHeight = surfaceTile.maximumHeight;
-
-        if (frameState.mode !== SceneMode.SCENE3D) {
-            southwestCornerCartesian = frameState.mapProjection.project(Rectangle.southwest(tile.rectangle), southwestCornerScratch);
-            southwestCornerCartesian.z = southwestCornerCartesian.y;
-            southwestCornerCartesian.y = southwestCornerCartesian.x;
-            southwestCornerCartesian.x = 0.0;
-            northeastCornerCartesian = frameState.mapProjection.project(Rectangle.northeast(tile.rectangle), northeastCornerScratch);
-            northeastCornerCartesian.z = northeastCornerCartesian.y;
-            northeastCornerCartesian.y = northeastCornerCartesian.x;
-            northeastCornerCartesian.x = 0.0;
-            westNormal = negativeUnitY;
-            eastNormal = Cartesian3.UNIT_Y;
-            southNormal = negativeUnitZ;
-            northNormal = Cartesian3.UNIT_Z;
-            maximumHeight = 0.0;
-        }
-
-        var cameraCartesianPosition = frameState.camera.positionWC;
-        var cameraCartographicPosition = frameState.camera.positionCartographic;
-
-        var vectorFromSouthwestCorner = Cartesian3.subtract(cameraCartesianPosition, southwestCornerCartesian, vectorScratch);
-        var distanceToWestPlane = Cartesian3.dot(vectorFromSouthwestCorner, westNormal);
-        var distanceToSouthPlane = Cartesian3.dot(vectorFromSouthwestCorner, southNormal);
-
-        var vectorFromNortheastCorner = Cartesian3.subtract(cameraCartesianPosition, northeastCornerCartesian, vectorScratch);
-        var distanceToEastPlane = Cartesian3.dot(vectorFromNortheastCorner, eastNormal);
-        var distanceToNorthPlane = Cartesian3.dot(vectorFromNortheastCorner, northNormal);
-
-        var cameraHeight;
-        if (frameState.mode === SceneMode.SCENE3D) {
-            cameraHeight = cameraCartographicPosition.height;
-        } else {
-            cameraHeight = cameraCartesianPosition.x;
-        }
-        var distanceFromTop = cameraHeight - maximumHeight;
-
-        var result = 0.0;
-
-        if (distanceToWestPlane > 0.0) {
-            result += distanceToWestPlane * distanceToWestPlane;
-        } else if (distanceToEastPlane > 0.0) {
-            result += distanceToEastPlane * distanceToEastPlane;
-        }
-
-        if (distanceToSouthPlane > 0.0) {
-            result += distanceToSouthPlane * distanceToSouthPlane;
-        } else if (distanceToNorthPlane > 0.0) {
-            result += distanceToNorthPlane * distanceToNorthPlane;
-        }
-
-        if (distanceFromTop > 0.0) {
-            result += distanceFromTop * distanceFromTop;
-        }
-
-        return Math.sqrt(result);
+        var tileBoundingBox = surfaceTile.tileBoundingBox;
+        return tileBoundingBox.distanceToCamera(frameState);
     };
 
     /**
@@ -631,10 +580,11 @@ define([
      *
      * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
      *
-     * @see GlobeSurfaceTileProvider#isDestroyed
      *
      * @example
      * provider = provider && provider();
+     *
+     * @see GlobeSurfaceTileProvider#isDestroyed
      */
     GlobeSurfaceTileProvider.prototype.destroy = function() {
         this._tileProvider = this._tileProvider && this._tileProvider.destroy();
@@ -765,6 +715,13 @@ define([
             u_waterMaskTranslationAndScale : function() {
                 return this.waterMaskTranslationAndScale;
             },
+            u_minMaxHeight : function() {
+                return this.minMaxHeight;
+            },
+            u_scaleAndBias : function() {
+                return this.scaleAndBias;
+            },
+
 
             initialColor : new Cartesian4(0.0, 0.0, 0.5, 1.0),
             zoomedOutOceanSpecularIntensity : 0.5,
@@ -790,7 +747,10 @@ define([
             southMercatorYAndOneOverHeight : new Cartesian2(),
 
             waterMask : undefined,
-            waterMaskTranslationAndScale : new Cartesian4()
+            waterMaskTranslationAndScale : new Cartesian4(),
+
+            minMaxHeight : new Cartesian2(),
+            scaleAndBias : new Matrix4()
         };
 
         return uniformMap;
@@ -803,24 +763,11 @@ define([
             return;
         }
 
-        if (defined(surfaceTile.meshForWireframePromise)) {
+        if (!defined(surfaceTile.terrainData) || !defined(surfaceTile.terrainData._mesh)) {
             return;
         }
 
-        surfaceTile.meshForWireframePromise = surfaceTile.terrainData.createMesh(provider._terrainProvider.tilingScheme, tile.x, tile.y, tile.level);
-        if (!defined(surfaceTile.meshForWireframePromise)) {
-            // deferrred
-            return;
-        }
-
-        var vertexArray = surfaceTile.vertexArray;
-
-        when(surfaceTile.meshForWireframePromise, function(mesh) {
-            if (surfaceTile.vertexArray === vertexArray) {
-                surfaceTile.wireframeVertexArray = createWireframeVertexArray(context, surfaceTile.vertexArray, mesh);
-            }
-            surfaceTile.meshForWireframePromise = undefined;
-        });
+        surfaceTile.wireframeVertexArray = createWireframeVertexArray(context, surfaceTile.vertexArray, surfaceTile.terrainData._mesh);
     }
 
     /**
@@ -948,6 +895,7 @@ define([
         }
 
         var rtc = surfaceTile.center;
+        var encoding = surfaceTile.pickTerrain.mesh.encoding;
 
         // Not used in 3D.
         var tileRectangle = tileRectangleScratch;
@@ -980,6 +928,20 @@ define([
                 tileRectangle.y -= rtc.z;
                 tileRectangle.z -= rtc.y;
                 tileRectangle.w -= rtc.z;
+            }
+
+            if (frameState.mode === SceneMode.SCENE2D && encoding.quantization === TerrainQuantization.BITS12) {
+                // In 2D, the texture coordinates of the tile are interpolated over the rectangle to get the position in the vertex shader.
+                // When the texture coordinates are quantized, error is introduced. This can be seen through the 1px wide cracking
+                // between the quantized tiles in 2D. To compensate for the error, move the expand the rectangle in each direction by
+                // half the error amount.
+                var epsilon = (1.0 / (Math.pow(2.0, 12.0) - 1.0)) * 0.5;
+                var widthEpsilon = (tileRectangle.z - tileRectangle.x) * epsilon;
+                var heightEpsilon = (tileRectangle.w - tileRectangle.y) * epsilon;
+                tileRectangle.x -= widthEpsilon;
+                tileRectangle.y -= heightEpsilon;
+                tileRectangle.z += widthEpsilon;
+                tileRectangle.w += heightEpsilon;
             }
 
             if (projection instanceof WebMercatorProjection) {
@@ -1129,7 +1091,11 @@ define([
             uniformMap.waterMask = waterMaskTexture;
             Cartesian4.clone(surfaceTile.waterMaskTranslationAndScale, uniformMap.waterMaskTranslationAndScale);
 
-            command.shaderProgram = tileProvider._surfaceShaderSet.getShaderProgram(context, frameState.mode, surfaceTile, numberOfDayTextures, applyBrightness, applyContrast, applyHue, applySaturation, applyGamma, applyAlpha, showReflectiveOcean, showOceanWaves, tileProvider.enableLighting, hasVertexNormals, useWebMercatorProjection, applyFog);
+            uniformMap.minMaxHeight.x = encoding.minimumHeight;
+            uniformMap.minMaxHeight.y = encoding.maximumHeight;
+            Matrix4.clone(encoding.matrix, uniformMap.scaleAndBias);
+
+            command.shaderProgram = tileProvider._surfaceShaderSet.getShaderProgram(frameState, surfaceTile, numberOfDayTextures, applyBrightness, applyContrast, applyHue, applySaturation, applyGamma, applyAlpha, showReflectiveOcean, showOceanWaves, tileProvider.enableLighting, hasVertexNormals, useWebMercatorProjection, applyFog);
             command.renderState = renderState;
             command.primitiveType = PrimitiveType.TRIANGLES;
             command.vertexArray = surfaceTile.vertexArray;
@@ -1179,9 +1145,10 @@ define([
 
         ++tileProvider._usedPickCommands;
 
+        var surfaceTile = drawCommand.owner.data;
         var useWebMercatorProjection = frameState.projection instanceof WebMercatorProjection;
 
-        pickCommand.shaderProgram = tileProvider._surfaceShaderSet.getPickShaderProgram(frameState.context, frameState.mode, useWebMercatorProjection);
+        pickCommand.shaderProgram = tileProvider._surfaceShaderSet.getPickShaderProgram(frameState, surfaceTile, useWebMercatorProjection);
         pickCommand.renderState = tileProvider._pickRenderState;
 
         pickCommand.owner = drawCommand.owner;

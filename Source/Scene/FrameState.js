@@ -3,7 +3,7 @@ define([
         './SceneMode'
     ], function(
         SceneMode) {
-    "use strict";
+    'use strict';
 
     /**
      * State information about the current frame.  An instance of this class
@@ -16,7 +16,7 @@ define([
      *
      * @private
      */
-    var FrameState = function(context, creditDisplay) {
+    function FrameState(context, creditDisplay) {
         /**
          * The rendering context.
          * @type {Context}
@@ -162,7 +162,7 @@ define([
         * @type {Number}
         */
         this.terrainExaggeration = 1.0;
-    };
+    }
 
     /**
      * A function that will be called at the end of the frame.

@@ -41,7 +41,7 @@ defineSuite([
         TimeIntervalCollectionPositionProperty,
         SceneMode,
         createScene) {
-    "use strict";
+    'use strict';
 
     var scene;
     var visualizer;
@@ -109,6 +109,25 @@ defineSuite([
 
         visualizer.update(JulianDate.now());
         expect(scene.primitives.length).toEqual(0);
+    });
+
+    it('adding and removing an entity path without rendering does not crash.', function() {
+        var times = [new JulianDate(0, 0), new JulianDate(1, 0)];
+        var positions = [new Cartesian3(1234, 5678, 9101112), new Cartesian3(5678, 1234, 1101112)];
+
+        var entityCollection = new EntityCollection();
+        visualizer = new PathVisualizer(scene, entityCollection);
+
+        var position = new SampledPositionProperty();
+        position.addSamples(times, positions);
+
+        var testObject = entityCollection.getOrCreateEntity('test');
+        testObject.position = position;
+        testObject.path = new PathGraphics();
+
+        //Before we fixed the issue, the below remove call would cause a crash
+        //when visualizer.update was not called at least once after the entity was added.
+        entityCollection.remove(testObject);
     });
 
     it('A PathGraphics causes a primitive to be created and updated.', function() {
@@ -491,7 +510,7 @@ defineSuite([
         expect(result).toEqual([new Cartesian3(0, 0, 3)]);
     });
 
-    var CustomPositionProperty = function(innerProperty) {
+    function CustomPositionProperty(innerProperty) {
         this.SampledProperty = innerProperty;
         this.isConstant = innerProperty.isConstant;
         this.definitionChanged = innerProperty.definitionChanged;
@@ -508,7 +527,7 @@ defineSuite([
         this.equals = function(other) {
             return innerProperty.equals(other);
         };
-    };
+    }
 
     it('subSample works for custom properties', function() {
         var t1 = new JulianDate(0, 0);

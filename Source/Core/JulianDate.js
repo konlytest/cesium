@@ -21,7 +21,7 @@ define([
         LeapSecond,
         TimeConstants,
         TimeStandard) {
-    "use strict";
+    'use strict';
 
     var gregorianDateScratch = new GregorianDate();
     var daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -174,7 +174,7 @@ define([
      * @param {Number} secondsOfDay The number of seconds into the current Julian Day Number.  Fractional seconds, negative seconds and seconds greater than a day will be handled correctly.
      * @param {TimeStandard} [timeStandard=TimeStandard.UTC] The time standard in which the first two parameters are defined.
      */
-    var JulianDate = function(julianDayNumber, secondsOfDay, timeStandard) {
+    function JulianDate(julianDayNumber, secondsOfDay, timeStandard) {
         /**
          * Gets or sets the number of whole days.
          * @type {Number}
@@ -200,7 +200,7 @@ define([
         if (timeStandard === TimeStandard.UTC) {
             convertUtcToTai(this);
         }
-    };
+    }
 
     /**
      * Creates a new instance from a JavaScript Date.

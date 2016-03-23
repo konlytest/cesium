@@ -21,7 +21,7 @@ defineSuite([
         LinearApproximation,
         CesiumMath,
         Quaternion) {
-    "use strict";
+    'use strict';
 
     it('constructor sets expected defaults', function() {
         var property = new SampledProperty(Cartesian3);
@@ -113,10 +113,9 @@ defineSuite([
     });
 
     it('works with PackableForInterpolation', function() {
-        var CustomType = function(value) {
+        function CustomType(value) {
             this.x = value;
-        };
-
+        }
         CustomType.packedLength = 1;
 
         CustomType.packedInterpolationLength = 2;

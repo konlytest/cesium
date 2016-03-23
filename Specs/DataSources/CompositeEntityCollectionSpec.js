@@ -23,14 +23,13 @@ defineSuite([
         ConstantProperty,
         Entity,
         EntityCollection) {
-    "use strict";
+    'use strict';
 
-    var CollectionListener = function() {
+    function CollectionListener() {
         this.timesCalled = 0;
         this.added = [];
         this.removed = [];
-    };
-
+    }
     CollectionListener.prototype.onCollectionChanged = function(collection, added, removed) {
         this.timesCalled++;
         this.added = added.slice(0);
@@ -42,6 +41,13 @@ defineSuite([
         expect(composite.collectionChanged).toBeDefined();
         expect(composite.getCollectionsLength()).toEqual(0);
         expect(composite.values.length).toEqual(0);
+    });
+
+    it('constructor with owner', function() {
+        var composite = new CompositeEntityCollection();
+        var child = new CompositeEntityCollection(undefined, composite);
+
+        expect(child.owner).toEqual(composite);
     });
 
     it('addCollection/removeCollection works', function() {

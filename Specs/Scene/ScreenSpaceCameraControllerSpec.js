@@ -41,7 +41,7 @@ defineSuite([
         createCanvas,
         destroyCanvas,
         DomEventSimulator) {
-    "use strict";
+    'use strict';
 
     var usePointerEvents = FeatureDetection.supportsPointerEvents();
     var scene;
@@ -49,21 +49,20 @@ defineSuite([
     var camera;
     var controller;
 
-    var MockScene = function(canvas, camera, ellipsoid) {
+    function MockScene(canvas, camera, ellipsoid) {
         this.canvas = canvas;
         this.camera = camera;
         this.globe = undefined;
         this.mapProjection = new GeographicProjection(ellipsoid);
         this.terrainExaggeration = 1.0;
-    };
+    }
 
-    var MockGlobe = function(ellipsoid) {
+    function MockGlobe(ellipsoid) {
         this.ellipsoid = ellipsoid;
         this.getHeight = function(cartographic) {
             return 0.0;
         };
-    };
-
+    }
     beforeAll(function() {
         canvas = createCanvas(1024, 768);
     });
@@ -132,7 +131,7 @@ defineSuite([
             DomEventSimulator.fireWheel(canvas, combine({
                 deltaY : -wheelDelta
             }));
-        } else if (defined(document.onmousewheel)) {
+        } else if (document.onmousewheel !== undefined) {
             DomEventSimulator.fireMouseWheel(canvas, combine({
                 wheelDelta : wheelDelta
             }));

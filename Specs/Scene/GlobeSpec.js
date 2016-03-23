@@ -21,7 +21,7 @@ defineSuite([
         SingleTileImageryProvider,
         createScene,
         pollToPromise) {
-    "use strict";
+    'use strict';
 
     var scene;
     var globe;
@@ -79,7 +79,7 @@ defineSuite([
         layerCollection.removeAll();
         layerCollection.addImageryProvider(new SingleTileImageryProvider({url : 'Data/Images/Red16x16.png'}));
 
-        scene.camera.viewRectangle(new Rectangle(0.0001, 0.0001, 0.0025, 0.0025), Ellipsoid.WGS84);
+        scene.camera.setView({ destination : new Rectangle(0.0001, 0.0001, 0.0025, 0.0025) });
 
         return updateUntilDone(globe).then(function() {
             scene.globe.show = false;
@@ -96,7 +96,7 @@ defineSuite([
         layerCollection.removeAll();
         layerCollection.addImageryProvider(new SingleTileImageryProvider({url : 'Data/Images/Red16x16.png'}));
 
-        scene.camera.viewRectangle(new Rectangle(0.0001, 0.0001, 0.0025, 0.0025), Ellipsoid.WGS84);
+        scene.camera.setView({ destination : new Rectangle(0.0001, 0.0001, 0.0025, 0.0025) });
 
         return updateUntilDone(globe).then(function() {
             scene.globe.show = false;
@@ -129,7 +129,7 @@ defineSuite([
         return pollToPromise(function() {
             return terrainProvider.ready;
         }).then(function() {
-            scene.camera.viewRectangle(new Rectangle(0.0001, 0.0001, 0.0025, 0.0025), Ellipsoid.WGS84);
+            scene.camera.setView({ destination : new Rectangle(0.0001, 0.0001, 0.0025, 0.0025) });
 
             return updateUntilDone(globe).then(function() {
                 scene.globe.show = false;

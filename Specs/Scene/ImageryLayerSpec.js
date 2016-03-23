@@ -9,6 +9,7 @@ defineSuite([
         'Renderer/ComputeEngine',
         'Scene/ArcGisMapServerImageryProvider',
         'Scene/BingMapsImageryProvider',
+        'Scene/createTileMapServiceImageryProvider',
         'Scene/Globe',
         'Scene/GlobeSurfaceTile',
         'Scene/Imagery',
@@ -17,7 +18,6 @@ defineSuite([
         'Scene/NeverTileDiscardPolicy',
         'Scene/QuadtreeTile',
         'Scene/SingleTileImageryProvider',
-        'Scene/TileMapServiceImageryProvider',
         'Scene/WebMapServiceImageryProvider',
         'Specs/createContext',
         'Specs/createFrameState',
@@ -32,6 +32,7 @@ defineSuite([
         ComputeEngine,
         ArcGisMapServerImageryProvider,
         BingMapsImageryProvider,
+        createTileMapServiceImageryProvider,
         Globe,
         GlobeSurfaceTile,
         Imagery,
@@ -40,12 +41,11 @@ defineSuite([
         NeverTileDiscardPolicy,
         QuadtreeTile,
         SingleTileImageryProvider,
-        TileMapServiceImageryProvider,
         WebMapServiceImageryProvider,
         createContext,
         createFrameState,
         pollToPromise) {
-    "use strict";
+    'use strict';
 
     var context;
     var frameState;
@@ -66,6 +66,8 @@ defineSuite([
         loadJsonp.loadAndExecuteScript = loadJsonp.defaultLoadAndExecuteScript;
         loadImage.createImage = loadImage.defaultCreateImage;
         loadWithXhr.load = loadWithXhr.defaultLoad;
+
+        frameState.commandList.length = 0;
     });
 
     function CustomDiscardPolicy() {
@@ -117,7 +119,7 @@ defineSuite([
         });
     });
 
-    it('reprojects web mercator images', function() {
+    function createWebMercatorProvider() {
         loadJsonp.loadAndExecuteScript = function(url, functionName) {
             window[functionName]({
                 "authenticationResultCode" : "ValidCredentials",
@@ -152,11 +154,14 @@ defineSuite([
             loadWithXhr.defaultLoad('Data/Images/Red16x16.png', responseType, method, data, headers, deferred);
         };
 
-        var provider = new BingMapsImageryProvider({
+        return new BingMapsImageryProvider({
             url : 'http://host.invalid',
             tileDiscardPolicy : new NeverTileDiscardPolicy()
         });
+    }
 
+    it('reprojects web mercator images', function() {
+        var provider = createWebMercatorProvider();
         var layer = new ImageryLayer(provider);
 
         return pollToPromise(function() {
@@ -176,6 +181,7 @@ defineSuite([
                 }).then(function() {
                     var textureBeforeReprojection = imagery.texture;
                     layer._reprojectTexture(frameState, imagery);
+                    layer.queueReprojectionCommands(frameState);
                     frameState.commandList[0].execute(computeEngine);
 
                     return pollToPromise(function() {
@@ -184,6 +190,34 @@ defineSuite([
                         expect(textureBeforeReprojection).not.toEqual(imagery.texture);
                         imagery.releaseReference();
                     });
+                });
+            });
+        });
+    });
+
+    it('cancels reprojection', function() {
+        var provider = createWebMercatorProvider();
+        var layer = new ImageryLayer(provider);
+
+        return pollToPromise(function() {
+            return provider.ready;
+        }).then(function() {
+            var imagery = new Imagery(layer, 0, 0, 0);
+            imagery.addReference();
+            layer._requestImagery(imagery);
+
+            return pollToPromise(function() {
+                return imagery.state === ImageryState.RECEIVED;
+            }).then(function() {
+                layer._createTexture(context, imagery);
+
+                return pollToPromise(function() {
+                    return imagery.state === ImageryState.TEXTURE_LOADED;
+                }).then(function() {
+                    layer._reprojectTexture(frameState, imagery);
+                    layer.cancelReprojections();
+                    layer.queueReprojectionCommands(frameState);
+                    expect(frameState.commandList.length).toEqual(0);
                 });
             });
         });
@@ -237,9 +271,26 @@ defineSuite([
         });
     });
 
+    it('getViewableRectangle works', function() {
+        var providerRectangle = Rectangle.fromDegrees(8.2, 61.09, 8.5, 61.7);
+        var provider = new SingleTileImageryProvider({
+            url : 'Data/Images/Green4x4.png',
+            rectangle : providerRectangle
+        });
+
+        var layerRectangle = Rectangle.fromDegrees(7.2, 60.9, 9.0, 61.7);
+        var layer = new ImageryLayer(provider, {
+            rectangle : layerRectangle
+        });
+
+        return layer.getViewableRectangle().then(function(rectangle) {
+            expect(rectangle).toEqual(Rectangle.intersection(providerRectangle, layerRectangle));
+        });
+    });
+
     describe('createTileImagerySkeletons', function() {
         it('handles a base layer that does not cover the entire globe', function() {
-            var provider = new TileMapServiceImageryProvider({
+            var provider = createTileMapServiceImageryProvider({
                 url : 'Data/TMS/SmallArea'
             });
 
@@ -288,7 +339,7 @@ defineSuite([
                 url : 'Data/Images/Blue.png'
             });
 
-            var provider = new TileMapServiceImageryProvider({
+            var provider = createTileMapServiceImageryProvider({
                 url : 'Data/TMS/SmallArea'
             });
 
@@ -334,7 +385,7 @@ defineSuite([
                 url : 'Data/Images/Green4x4.png'
             });
 
-            var provider = new TileMapServiceImageryProvider({
+            var provider = createTileMapServiceImageryProvider({
                 url : 'Data/TMS/SmallArea'
             });
 

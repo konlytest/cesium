@@ -29,7 +29,7 @@ defineSuite([
         createContext,
         createFrameState,
         render) {
-    "use strict";
+    'use strict';
 
     var context;
     var frameState;
@@ -42,7 +42,7 @@ defineSuite([
     beforeEach(function() {
         frameState = createFrameState(context);
 
-        frameState.camera.viewRectangle(rectangle);
+        frameState.camera.setView({ destination : rectangle });
         var us = context.uniformState;
         us.update(frameState);
     });

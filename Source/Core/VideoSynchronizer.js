@@ -17,7 +17,7 @@ define([
         Event,
         Iso8601,
         JulianDate) {
-    "use strict";
+    'use strict';
 
     /**
      * Synchronizes a video element with a simulation clock.
@@ -33,7 +33,7 @@ define([
      *
      * @demo {@link http://cesiumjs.org/Cesium/Apps/Sandcastle/index.html?src=Video.html|Video Material Demo}
      */
-    var VideoSynchronizer = function(options) {
+    function VideoSynchronizer(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
 
         this._clock = undefined;
@@ -65,7 +65,7 @@ define([
         this._seeking = false;
         this._seekFunction = undefined;
         this._firstTickAfterSeek = false;
-    };
+    }
 
     defineProperties(VideoSynchronizer.prototype, {
         /**

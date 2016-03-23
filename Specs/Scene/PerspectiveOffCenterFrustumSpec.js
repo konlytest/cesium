@@ -13,7 +13,7 @@ defineSuite([
         Cartesian4,
         CesiumMath,
         Matrix4) {
-    "use strict";
+    'use strict';
 
     var frustum, planes;
 
@@ -123,30 +123,6 @@ defineSuite([
 
         var expected = Matrix4.computeInfinitePerspectiveOffCenter(left, right, bottom, top, near, new Matrix4());
         expect(expected).toEqual(frustum.infiniteProjectionMatrix);
-    });
-
-    it('get pixel size throws without canvas dimensions', function() {
-        expect(function() {
-            return frustum.getPixelSize();
-        }).toThrowDeveloperError();
-    });
-
-    it('get pixel size throws without canvas width less than or equal to zero', function() {
-        expect(function() {
-            return frustum.getPixelSize(new Cartesian2(0.0, 1.0));
-        }).toThrowDeveloperError();
-    });
-
-    it('get pixel size throws without canvas height less than or equal to zero', function() {
-        expect(function() {
-            return frustum.getPixelSize(new Cartesian2(1.0, 0.0));
-        }).toThrowDeveloperError();
-    });
-
-    it('get pixel size', function() {
-        var pixelSize = frustum.getPixelSize(new Cartesian2(1.0, 1.0));
-        expect(pixelSize.x).toEqual(2.0);
-        expect(pixelSize.y).toEqual(2.0);
     });
 
     it('get pixel dimensions throws without canvas height', function() {

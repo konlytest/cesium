@@ -19,7 +19,7 @@ define([
         GeometryAttribute,
         GeometryAttributes,
         PrimitiveType) {
-    "use strict";
+    'use strict';
 
     /**
      * Describes a collection of points made up of positions and colors.
@@ -43,7 +43,7 @@ define([
      *
      * @private
      */
-    var PointGeometry = function(options) {
+    function PointGeometry(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
 
         //>>includeStart('debug', pragmas.debug);
@@ -60,7 +60,7 @@ define([
         this._boundingSphere = BoundingSphere.clone(options.boundingSphere);
 
         this._workerName = 'createPointGeometry';
-    };
+    }
 
     /**
      * Computes the geometric representation a point collection, including its vertices and a bounding sphere.

@@ -45,7 +45,7 @@ defineSuite([
         createDynamicGeometryBoundingSphereSpecs,
         createDynamicProperty,
         createScene) {
-    "use strict";
+    'use strict';
 
     var scene;
     var time;
@@ -544,4 +544,4 @@ defineSuite([
     createDynamicGeometryBoundingSphereSpecs(PolygonGeometryUpdater, entity, entity.polygon, function() {
         return scene;
     });
-});
+}, 'WebGL');

@@ -3,7 +3,7 @@ define([
         '../Core/defineProperties'
     ], function(
         defineProperties) {
-    "use strict";
+    'use strict';
 
     /**
      * A queue that can enqueue items at the end, and dequeue items from the front.
@@ -11,11 +11,11 @@ define([
      * @alias Queue
      * @constructor
      */
-    var Queue = function() {
+    function Queue() {
         this._array = [];
         this._offset = 0;
         this._length = 0;
-    };
+    }
 
     defineProperties(Queue.prototype, {
         /**

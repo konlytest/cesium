@@ -35,7 +35,7 @@ define([
         PolylinePipeline,
         PrimitiveType,
         VertexFormat) {
-    "use strict";
+    'use strict';
 
     var scratchInterpolateColorsArray = [];
 
@@ -110,7 +110,7 @@ define([
      * });
      * var geometry = Cesium.PolylineGeometry.createGeometry(polyline);
      */
-    var PolylineGeometry = function(options) {
+    function PolylineGeometry(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
         var positions = options.positions;
         var colors = options.colors;
@@ -147,11 +147,10 @@ define([
          * @type {Number}
          */
         this.packedLength = numComponents + Ellipsoid.packedLength + VertexFormat.packedLength + 4;
-    };
+    }
 
     /**
      * Stores the provided instance into the provided array.
-     * @function
      *
      * @param {PolylineGeometry} value The value to pack.
      * @param {Number[]} array The array to pack into.
@@ -298,8 +297,6 @@ define([
         var granularity = polylineGeometry._granularity;
         var ellipsoid = polylineGeometry._ellipsoid;
 
-        var minDistance = CesiumMath.chordLength(granularity, ellipsoid.maximumRadius);
-
         var i;
         var j;
         var k;
@@ -313,6 +310,7 @@ define([
 
         if (followSurface) {
             var heights = PolylinePipeline.extractHeights(positions, ellipsoid);
+            var minDistance = CesiumMath.chordLength(granularity, ellipsoid.maximumRadius);
 
             if (defined(colors)) {
                 var colorLength = 1;

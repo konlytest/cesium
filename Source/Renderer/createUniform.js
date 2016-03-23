@@ -21,12 +21,12 @@ define([
         Matrix3,
         Matrix4,
         RuntimeError) {
-    "use strict";
+    'use strict';
 
     /**
      * @private
      */
-    var createUniform = function(gl, activeUniform, uniformName, location) {
+    function createUniform(gl, activeUniform, uniformName, location) {
         switch (activeUniform.type) {
             case gl.FLOAT:
                 return new UniformFloat(gl, activeUniform, uniformName, location);
@@ -60,9 +60,7 @@ define([
             default:
                 throw new RuntimeError('Unrecognized uniform type: ' + activeUniform.type + ' for uniform "' + uniformName + '".');
         }
-    };
-
-    ///////////////////////////////////////////////////////////////////////////
+    }
 
     function UniformFloat(gl, activeUniform, uniformName, location) {
         /**

@@ -5,14 +5,14 @@ define([
     ], function(
         defaultValue,
         PrimitiveType) {
-    "use strict";
+    'use strict';
 
     /**
      * Represents a command to the renderer for drawing.
      *
      * @private
      */
-    var DrawCommand = function(options) {
+    function DrawCommand(options) {
         options = defaultValue(options, defaultValue.EMPTY_OBJECT);
 
         /**
@@ -188,7 +188,7 @@ define([
          * @private
          */
         this.oit = undefined;
-    };
+    }
 
     /**
      * Executes the draw command.

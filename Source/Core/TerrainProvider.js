@@ -9,7 +9,7 @@ define([
         defineProperties,
         DeveloperError,
         CesiumMath) {
-    "use strict";
+    'use strict';
 
     /**
      * Provides terrain or other geometry for the surface of an ellipsoid.  The surface geometry is
@@ -23,9 +23,9 @@ define([
      * @see CesiumTerrainProvider
      * @see ArcGisImageServerTerrainProvider
      */
-    var TerrainProvider = function() {
+    function TerrainProvider() {
         DeveloperError.throwInstantiationError();
-    };
+    }
 
     defineProperties(TerrainProvider.prototype, {
         /**
